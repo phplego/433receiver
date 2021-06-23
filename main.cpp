@@ -13,10 +13,16 @@
 #define BUZZER_PIN      D6
 #define LED_PIN         D7
 
-#define MQTT_HOST "192.168.1.157"         // MQTT host (m21.cloudmqtt.com)
-#define MQTT_PORT 11883                   // MQTT port (18076)
-#define MQTT_USER "KJsdfyUYADSFhjscxv678" // Ingored if brocker allows guest connection
-#define MQTT_PASS "d6823645823746dcfgwed" // Ingored if brocker allows guest connection
+#define CODE_DING_DONG  123467
+
+#define MQTT_HOST       "xxx.xxx.xxx.xxx"       // MQTT host (eg m21.cloudmqtt.com)
+#define MQTT_PORT       1883                    // MQTT port (18076)
+#define MQTT_USER       "KJsdfyUYADSFhjscxv678" // Ingored if brocker allows guest connection
+#define MQTT_PASS       "d6823645823746dcfgwed" // Ingored if brocker allows guest connection
+
+#if __has_include("local-constants.h")
+#include "local-constants.h"                    // Override some constants if local file exists
+#endif
 
 String gDeviceName  = "433receiver";
 String gTopic       = "wifi2mqtt/433receiver";
@@ -250,6 +256,10 @@ void handleRadio()
         serializeJson(doc, json);
 
         mqttClient.publish(gTopic, json);
+
+        if(receivedValue == CODE_DING_DONG){
+            rtttl.play("Mario:d=4,o=5,b=150:32p,16e6,16e6,16p,16e6,16p,16c6,16e6,16p,16g6,8p,16p,16g");
+        }
         
         mySwitch.resetAvailable();
     }
