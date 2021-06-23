@@ -5,6 +5,7 @@
 #include <WiFiManager.h>
 #include <MQTT.h>
 #include <ArduinoJson.h>
+#include <ESP8266WebServer.h>
 
 #include "DubRtttl.h"
 
@@ -20,11 +21,12 @@
 String gDeviceName  = "433receiver";
 String gTopic       = "wifi2mqtt/433receiver";
 
-WiFiManager wifiManager;
-WiFiClient  wifiClient;
-RCSwitch    mySwitch;
-MQTTClient  mqttClient(10000);
-DubRtttl    rtttl(BUZZER_PIN);
+WiFiManager         wifiManager;
+WiFiClient          wifiClient;
+RCSwitch            mySwitch;
+MQTTClient          mqttClient(10000);
+DubRtttl            rtttl(BUZZER_PIN);
+ESP8266WebServer    webServer(80);
 
 void myTone(int freq, int duration)
 {
@@ -86,6 +88,7 @@ void setup()
     //pinMode(D3, INPUT);
     pinMode(BUZZER_PIN, OUTPUT);
     pinMode(LED_PIN, OUTPUT);
+    //mySwitch.setReceiveTolerance(200);
     mySwitch.enableReceive(RECEIVER_PIN); // Receiver on interrupt 0 => that is pin #2
 
     // Play 'start' melody
@@ -125,6 +128,75 @@ void setup()
     bool ok = mqttClient.publish(gTopic, "started");
     Serial.println(ok ? "Published: OK" : "Published: ERR");
 
+    // setup webserver 
+
+    webServer.begin();
+
+    String menu;
+        menu += "<div>";
+        menu += "<a href='/'>index</a> ";
+        menu += "<a href='/play'>play</a> ";
+        menu += "<a href='/logout'>logout</a> ";
+        menu += "</div><hr>";
+
+    webServer.on("/", [menu](){
+        String str = ""; 
+        str += menu;
+        str += "<pre>";
+        str += String() + "           Uptime: " + (millis() / 1000) + " \n";
+        str += String() + "      FullVersion: " + ESP.getFullVersion() + " \n";
+        str += String() + "      ESP Chip ID: " + ESP.getChipId() + " \n";
+        str += String() + "         Hostname: " + WiFi.hostname() + " \n";
+        str += String() + "       CpuFreqMHz: " + ESP.getCpuFreqMHz() + " \n";
+        str += String() + "      WiFi status: " + wifiClient.status() + " \n";
+        str += String() + "         FreeHeap: " + ESP.getFreeHeap() + " \n";
+        str += String() + "       SketchSize: " + ESP.getSketchSize() + " \n";
+        str += String() + "  FreeSketchSpace: " + ESP.getFreeSketchSpace() + " \n";
+        str += String() + "    FlashChipSize: " + ESP.getFlashChipSize() + " \n";
+        str += String() + "FlashChipRealSize: " + ESP.getFlashChipRealSize() + " \n";
+        str += "</pre>";
+
+        webServer.send(200, "text/html; charset=utf-8", str);     
+    });
+
+    // Logout (reset wifi settings)
+    webServer.on("/logout", [menu](){
+        if(webServer.method() == HTTP_POST){
+            webServer.send(200, "text/html", "OK");
+            wifiManager.resetSettings();
+            ESP.reset();
+        }
+        else{
+            String output = "";
+            output += menu;
+            output += String() + "<pre>";
+            output += String() + "Wifi network: " + WiFi.SSID() + " \n";
+            output += String() + "        RSSI: " + WiFi.RSSI() + " \n";
+            output += String() + "    hostname: " + WiFi.hostname() + " \n";
+            output += String() + "</pre>";
+            output += "<form method='post'><button>Forget</button></form>";
+            webServer.send(200, "text/html", output);
+        }
+    });
+
+    // Play melody 
+    webServer.on("/play", [](){
+        if(webServer.method() == HTTP_POST){
+            String melody = webServer.arg("melody");
+
+            if(melody.length() > 0){
+                rtttl.play(melody);
+                webServer.send(200, "text/html", String("Playing melody: ") + melody);        
+            }
+            else
+                webServer.send(400, "text/html", "'melody' GET parameter is required");
+        }
+        else{
+            webServer.send(400, "text/html", "<form method='POST'><textarea name='melody'></textarea><button>play</button></form>");
+        }
+    });
+
+
     // Initialize OTA (firmware updates via WiFi)
     ArduinoOTA.begin();
 
@@ -134,7 +206,7 @@ void setup()
     myTone(1500, 100);
 }
 
-void loop()
+void handleRadio()
 {
     if (mySwitch.available())
     {
@@ -143,21 +215,7 @@ void loop()
         long receivedValue = mySwitch.getReceivedValue();
         int delay = mySwitch.getReceivedDelay();
 
-        //Serial.print("Value: ");
-        // Serial.print(receivedValue);
-        // Serial.print(" bit length: ");
-        // Serial.print(mySwitch.getReceivedBitlength());
-        // Serial.print(" Delay: ");
-        // Serial.print(mySwitch.getReceivedDelay());
-        // Serial.print("RawData: ");
-        // Serial.println(mySwitch.getReceivedRawdata());
-        // Serial.print(" Protocol: ");
-        // Serial.println(mySwitch.getReceivedProtocol());
-
-        mySwitch.resetAvailable();
-
         DynamicJsonDocument doc(1024);
-
         doc["id"] = receivedValue;
         doc["delay"] = delay;
 
@@ -165,11 +223,19 @@ void loop()
         serializeJson(doc, json);
 
         mqttClient.publish(gTopic, json);
+        
+        mySwitch.resetAvailable();
     }
 
+}
+
+void loop()
+{
+    handleRadio();
     ArduinoOTA.handle();
-    mqttClient.loop();
     rtttl.loop();
+    webServer.handleClient();
+    mqttClient.loop();
 
     if (!mqttClient.connected())
     {
