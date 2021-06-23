@@ -21,10 +21,10 @@ String gDeviceName  = "433receiver";
 String gTopic       = "wifi2mqtt/433receiver";
 
 WiFiManager wifiManager;
-WiFiClient wifiClient;
-RCSwitch mySwitch = RCSwitch();
-MQTTClient mqttClient(10000);
-DubRtttl rtttl(BUZZER_PIN);
+WiFiClient  wifiClient;
+RCSwitch    mySwitch;
+MQTTClient  mqttClient(10000);
+DubRtttl    rtttl(BUZZER_PIN);
 
 void myTone(int freq, int duration)
 {
