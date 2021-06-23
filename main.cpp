@@ -8,9 +8,9 @@
 
 #include "DubRtttl.h"
 
-#define RECEIVER_PIN D5
-#define BUZZER_PIN D6
-#define LED_PIN D7
+#define RECEIVER_PIN    D5
+#define BUZZER_PIN      D6
+#define LED_PIN         D7
 
 #define MQTT_HOST "192.168.1.157"         // MQTT host (m21.cloudmqtt.com)
 #define MQTT_PORT 11883                   // MQTT port (18076)
