@@ -51,6 +51,12 @@ void messageReceived(String &topic, String &payload)
             // play 'melody' json key 
             rtttl.play(doc["melody"]);
         }
+
+        if (doc.containsKey("tone"))
+        {
+            // play tone HZ   
+            tone(BUZZER_PIN, doc["tone"].as<float>(), 2000);
+        }
     }
 
     if (topic == gTopic + "/play")
