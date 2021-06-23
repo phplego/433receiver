@@ -136,6 +136,7 @@ void setup()
         menu += "<div>";
         menu += "<a href='/'>index</a> ";
         menu += "<a href='/play'>play</a> ";
+        menu += "<a href='/restart'>restart</a> ";
         menu += "<a href='/logout'>logout</a> ";
         menu += "</div><hr>";
 
@@ -159,6 +160,43 @@ void setup()
         webServer.send(200, "text/html; charset=utf-8", str);     
     });
 
+
+    // Play melody 
+    webServer.on("/play", [menu](){
+        if(webServer.method() == HTTP_POST){
+            String melody = webServer.arg("melody");
+
+            if(melody.length() > 0){
+                rtttl.play(melody);
+                webServer.send(200, "text/html", String("Playing melody: ") + melody);        
+            }
+            else
+                webServer.send(400, "text/html", "'melody' GET parameter is required");
+        }
+        else{
+            webServer.send(400, "text/html", menu + "<form method='POST'><textarea name='melody'></textarea><button>play</button></form>");
+        }
+    });
+
+
+    // Restart ESP
+    webServer.on("/restart", [menu](){
+        if(webServer.method() == HTTP_POST){
+            webServer.send(200, "text/html", "OK");
+            ESP.reset();
+        }
+        else{
+            String output = "";
+            output += menu;
+            output += String() + "<pre>";
+            output += String() + "Uptime: " + (millis() / 1000) + " \n";
+            output += String() + "</pre>";
+            output += "<form method='post'><button>Restart ESP now!</button></form>";
+            webServer.send(400, "text/html", output);
+        }
+    });
+
+
     // Logout (reset wifi settings)
     webServer.on("/logout", [menu](){
         if(webServer.method() == HTTP_POST){
@@ -176,23 +214,6 @@ void setup()
             output += String() + "</pre>";
             output += "<form method='post'><button>Forget</button></form>";
             webServer.send(200, "text/html", output);
-        }
-    });
-
-    // Play melody 
-    webServer.on("/play", [](){
-        if(webServer.method() == HTTP_POST){
-            String melody = webServer.arg("melody");
-
-            if(melody.length() > 0){
-                rtttl.play(melody);
-                webServer.send(200, "text/html", String("Playing melody: ") + melody);        
-            }
-            else
-                webServer.send(400, "text/html", "'melody' GET parameter is required");
-        }
-        else{
-            webServer.send(400, "text/html", "<form method='POST'><textarea name='melody'></textarea><button>play</button></form>");
         }
     });
 
