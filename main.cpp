@@ -25,7 +25,7 @@
 #include "local-constants.h"                    // Override some constants if local file exists
 #endif
 
-String gDeviceName  = String() + "433receiver" + ESP.getChipId();
+String gDeviceName  = String() + "433receiver-" + ESP.getChipId();
 String gTopic       = "wifi2mqtt/433receiver";
 
 WiFiManager         wifiManager;
@@ -114,10 +114,6 @@ void setup()
     myTone(400, 100);
     myTone(1200, 100);
 
-
-    WiFi.hostname(gDeviceName);
-    WiFi.mode(WIFI_STA); // no access point after connect
-
     wifi_set_sleep_type(NONE_SLEEP_T); // prevent wifi sleep (stronger connection)
 
     // On Access Point started (not called if wifi is configured)
@@ -138,6 +134,10 @@ void setup()
     {
         ESP.restart();
     }
+
+    String hostname = String() + "esp-" + gDeviceName;
+    hostname.replace('.', '_'); 
+    WiFi.hostname(hostname);
 
     mqttClient.begin(MQTT_HOST, MQTT_PORT, wifiClient);
     mqttClient.onMessage(messageReceived);
