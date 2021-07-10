@@ -6,8 +6,10 @@
 #include <MQTT.h>
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
+#include <LittleFS.h>
 
 #include "DubRtttl.h"
+#include "Logger.h"
 
 #define RECEIVER_PIN    D5
 #define BUZZER_PIN      D6
@@ -24,15 +26,16 @@
 #include "local-constants.h"                    // Override some constants if local file exists
 #endif
 
-String gDeviceName  = "433receiver";
+String gDeviceName  = String() + "433receiver" + ESP.getChipId();
 String gTopic       = "wifi2mqtt/433receiver";
 
 WiFiManager         wifiManager;
 WiFiClient          wifiClient;
 RCSwitch            mySwitch;
 MQTTClient          mqttClient(10000);
-DubRtttl            rtttl(BUZZER_PIN);
 ESP8266WebServer    webServer(80);
+DubRtttl            rtttl(BUZZER_PIN);
+Logger              logger;
 
 void myTone(int freq, int duration)
 {
@@ -42,7 +45,7 @@ void myTone(int freq, int duration)
 
 void messageReceived(String &topic, String &payload)
 {
-    Serial.println("incoming: " + topic + " - " + payload);
+    logger.log("MQTT msg: " + topic + " " + payload);
 
     if (topic == gTopic + "/set")
     {
@@ -74,28 +77,32 @@ void messageReceived(String &topic, String &payload)
 
 void mqtt_connect()
 {
-    Serial.print("checking wifi...");
+    logger.log_no_ln("checking wifi...");
     while (WiFi.status() != WL_CONNECTED)
     {
-        Serial.print(".");
+        logger.print(".");
         delay(1000);
     }
-
-    Serial.print("\nconnecting...");
+    logger.println(" OK");
+    logger.log_no_ln("connecting...");
     while (!mqttClient.connect(gDeviceName.c_str(), MQTT_USER, MQTT_PASS))
     {
-        Serial.print(".");
+        logger.print(".");
         delay(1000);
     }
+    logger.println(" OK");
 
-    Serial.println("\nconnected!");
+    logger.log("connected!");
 
     mqttClient.subscribe(gTopic + "/set");
     mqttClient.subscribe(gTopic + "/play");
 }
 
+
 void setup()
 {
+    logger.log("Setup begin");
+
     Serial.begin(74880);
     //pinMode(D3, INPUT);
     pinMode(BUZZER_PIN, OUTPUT);
@@ -108,6 +115,7 @@ void setup()
     myTone(400, 100);
     myTone(1200, 100);
 
+
     WiFi.hostname(gDeviceName);
     WiFi.mode(WIFI_STA); // no access point after connect
 
@@ -116,10 +124,10 @@ void setup()
     // On Access Point started (not called if wifi is configured)
     wifiManager.setAPCallback([](WiFiManager *mgr)
                               {
-                                  Serial.println(String("Please connect to Wi-Fi"));
-                                  Serial.println(String("Network: ") + mgr->getConfigPortalSSID());
-                                  Serial.println(String("Password: 12341234"));
-                                  Serial.println(String("Then go to ip: 10.0.1.1"));
+                                  logger.log(String("Please connect to Wi-Fi"));
+                                  logger.log(String("Network: ") + mgr->getConfigPortalSSID());
+                                  logger.log(String("Password: 12341234"));
+                                  logger.log(String("Then go to ip: 10.0.1.1"));
                               });
 
     wifiManager.setAPStaticIPConfig(IPAddress(10, 0, 1, 1), IPAddress(10, 0, 1, 1), IPAddress(255, 255, 255, 0));
@@ -138,17 +146,23 @@ void setup()
     mqtt_connect();
 
     bool ok = mqttClient.publish(gTopic, "started");
-    Serial.println(ok ? "Published: OK" : "Published: ERR");
+    logger.log(ok ? "Status successfully published to MQTT" : "Cannot publish status to MQTT");
+
+    LittleFS.begin();
 
     // setup webserver 
-
     webServer.begin();
 
+    //webServer.serveStatic("/logs.js", LittleFS, "/logs.js");
+    
+    
     String menu;
         menu += "<div>";
-        menu += "<a href='/'>index</a> ";
         menu += "<a href='/play'>play</a> ";
+        menu += "<a href='/'>index</a> ";
         menu += "<a href='/restart'>restart</a> ";
+        menu += "<a href='/logs'>logs</a> ";
+        menu += "<a href='/fs'>FS</a> ";
         menu += "<a href='/logout'>logout</a> ";
         menu += "</div><hr>";
 
@@ -186,10 +200,9 @@ void setup()
                 webServer.send(400, "text/html", "'melody' GET parameter is required");
         }
         else{
-            webServer.send(400, "text/html", menu + "<form method='POST'><textarea name='melody'></textarea><button>play</button></form>");
+            webServer.send(400, "text/html", menu + "<form method='POST'><textarea name='melody'>Intel:d=16,o=5,b=320:d,p,d,p,d,p,g,p,g,p,g,p,d,p,d,p,d,p,a,p,a,p,a,2p</textarea><button>play</button></form>");
         }
     });
-
 
     // Restart ESP
     webServer.on("/restart", [menu](){
@@ -208,6 +221,46 @@ void setup()
         }
     });
 
+    // Show logs page
+    webServer.on("/logs", [menu](){
+        String output = "";
+        output += menu;
+        output += String() + "millis: <span id='millis'>"+millis()+"</span>";
+        output += String() + "<pre id='text'>";
+        output += String() + logger.buffer;
+        output += String() + "</pre>\n";
+        output += String() + "<script>\n";
+        output += String() + "const millis = " + millis()+"\n";
+        output += String() + "const replaceFunc = x => {\n";
+        output += String() +    "const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
+        output += String() +    "return new Date(Date.now() - deltaMillis).toLocaleString('RU')\n";
+        output += String() + "}\n";
+        output += String() + "document.getElementById('text').innerHTML = document.getElementById('text').innerHTML.replaceAll(/^\\d{3,}\\.\\d{3}/mg, replaceFunc)\n";
+        output += String() + "</script>";
+        webServer.send(400, "text/html", output);
+    });
+    
+    // Show filesystem list of files
+    webServer.on("/fs", [menu](){
+        String output = "";
+        output += menu;
+
+        File f = LittleFS.open("manual.txt", "w");
+        f.print("hello");
+        f.close();
+
+        output += String() + "<pre>";
+        Dir root = LittleFS.openDir("/");
+        root.next();
+        File file = root.openFile("r");
+        while(file){
+            output += String() + file.size() + "B " + file.name() + "\n";
+            root.next();
+            file = root.openFile("r");
+        }
+        output += String() + "</pre>";
+        webServer.send(400, "text/html", output);
+    });
 
     // Logout (reset wifi settings)
     webServer.on("/logout", [menu](){
@@ -228,6 +281,7 @@ void setup()
             webServer.send(200, "text/html", output);
         }
     });
+    
 
 
     // Initialize OTA (firmware updates via WiFi)
@@ -239,18 +293,50 @@ void setup()
     myTone(1500, 100);
 }
 
+boolean in_array(unsigned int array[], int sz, unsigned int element) {
+ for (int i = 0; i < sz; i++) {
+      if (array[i] == element) {
+          return true;
+      }
+    }
+  return false;
+ }
+
+
+unsigned int spamList [] = {
+    11283408,
+    11283248
+};
+
+
+
 void handleRadio()
 {
     if (mySwitch.available())
     {
-        tone(BUZZER_PIN, 800, 50); // beep sound
-        tone(LED_PIN, 800, 50);    // flash led
         long receivedValue = mySwitch.getReceivedValue();
         int delay = mySwitch.getReceivedDelay();
+
+        logger.log(String()+"got value " + receivedValue + 
+            " p: "+mySwitch.getReceivedProtocol() + 
+            " d: " + mySwitch.getReceivedDelay() + 
+            " l: " + mySwitch.getReceivedBitlength());
+
+        if(in_array(spamList, sizeof(spamList)/sizeof(int),  receivedValue) || receivedValue < 1000){
+            tone(BUZZER_PIN, 800, 10); // beep sound
+        }
+        else{
+            tone(BUZZER_PIN, 800, 50); // beep sound
+        }
+        tone(LED_PIN, 800, 50);    // flash led
+
 
         DynamicJsonDocument doc(1024);
         doc["id"] = receivedValue;
         doc["delay"] = delay;
+        doc["proto"] = mySwitch.getReceivedProtocol();
+        doc["len"] = mySwitch.getReceivedBitlength();
+
 
         String json;
         serializeJson(doc, json);
