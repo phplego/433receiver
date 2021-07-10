@@ -6,7 +6,6 @@
 #include <MQTT.h>
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
-#include <LittleFS.h>
 
 #include "DubRtttl.h"
 #include "Logger.h"
@@ -148,7 +147,7 @@ void setup()
     bool ok = mqttClient.publish(gTopic, "started");
     logger.log(ok ? "Status successfully published to MQTT" : "Cannot publish status to MQTT");
 
-    LittleFS.begin();
+    SPIFFS.begin();
 
     // setup webserver 
     webServer.begin();
@@ -245,22 +244,20 @@ void setup()
         String output = "";
         output += menu;
 
-        File f = LittleFS.open("manual.txt", "w");
+        output += String() + "<pre>";
+
+        File f = SPIFFS.open("/manual.txt", "w");
         f.print("hello");
         f.close();
-
-        output += String() + "<pre>";
-        Dir root = LittleFS.openDir("/");
-        root.next();
-        File file = root.openFile("r");
-        while(file){
-            output += String() + file.size() + "B " + file.name() + "\n";
-            root.next();
-            file = root.openFile("r");
+        Dir dir = SPIFFS.openDir("/");
+        while (dir.next()) {
+            output += String() + dir.fileSize() + "B " + dir.fileName() + "\n";
         }
+
         output += String() + "</pre>";
         webServer.send(400, "text/html", output);
     });
+
 
     // Logout (reset wifi settings)
     webServer.on("/logout", [menu](){
