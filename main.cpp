@@ -6,6 +6,7 @@
 #include <MQTT.h>
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
+//#include <LittleFS.h>
 
 #include "DubRtttl.h"
 #include "Logger.h"
@@ -147,12 +148,16 @@ void setup()
     bool ok = mqttClient.publish(gTopic, "started");
     logger.log(ok ? "Status successfully published to MQTT" : "Cannot publish status to MQTT");
 
-    SPIFFS.begin();
+    if(!SPIFFS.begin()){
+        logger.log("format SPIFFS...");
+        SPIFFS.format();
+        SPIFFS.begin();
+    }
 
     // setup webserver 
     webServer.begin();
 
-    //webServer.serveStatic("/logs.js", LittleFS, "/logs.js");
+    //webServer.serveStatic("/logs.js", SPIFFS, "/logs.js");
     
     
     String menu;
