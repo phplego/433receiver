@@ -274,12 +274,7 @@ void setup()
     webServer.on("/fs", [menu](){
         String output = "";
         output += menu;
-
         output += String() + "<pre>";
-
-        File f = SPIFFS.open("/manual.txt", "w");
-        f.print("hello");
-        f.close();
         Dir dir = SPIFFS.openDir("");
         while (dir.next()) {
             output += String() + dir.fileSize() + "B " + dir.fileName() + "\n";
