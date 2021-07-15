@@ -9,8 +9,10 @@ Logger::Logger()
 void Logger::log_no_ln(String message)
 {
     char buff [20];
-    sprintf(buff, "%03d.%03d ", millis() / 1000, millis() % 1000);
-    this->print(String() + buff + message);
+    sprintf(buff, "%03lu.%03lu ", millis() / 1000, millis() % 1000);
+    String output = String() + buff + message;
+    this->print(output);
+    Serial.print(output);
 }
 
 void Logger::log(String message)
