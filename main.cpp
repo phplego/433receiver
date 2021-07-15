@@ -162,8 +162,9 @@ void setup()
     
     String menu;
         menu += "<div>";
-        menu += "<a href='/play'>play</a> ";
         menu += "<a href='/'>index</a> ";
+        menu += "<a href='/stop-list'>stop-list</a> ";
+        menu += "<a href='/play'>play</a> ";
         menu += "<a href='/restart'>restart</a> ";
         menu += "<a href='/logs'>logs</a> ";
         menu += "<a href='/fs'>FS</a> ";
@@ -190,6 +191,31 @@ void setup()
         webServer.send(200, "text/html; charset=utf-8", str);     
     });
 
+    // Stop list
+    webServer.on("/stop-list", [menu](){
+        String output = menu;
+        if(webServer.method() == HTTP_POST){
+            String list = webServer.arg("list");
+            File f = SPIFFS.open("stop-list.txt", "w");
+
+            if(f && f.print(list) == list.length()){
+                output += "Saved OK.<br>";
+                f.close();
+            }
+            else{
+                output += "Failed to save.<br>";
+            }
+        }
+        output += "New line separated values to be ignored:<br>";
+        output += "<form method='POST'><textarea name='list' rows=10>";
+        File f = SPIFFS.open("stop-list.txt", "r");
+        output += f.readString();
+        f.close();
+        output += "</textarea><br><button>save</button></form>";
+        webServer.send(200, "text/html", output);
+    });
+
+
 
     // Play melody 
     webServer.on("/play", [menu](){
@@ -204,7 +230,7 @@ void setup()
                 webServer.send(400, "text/html", "'melody' GET parameter is required");
         }
         else{
-            webServer.send(400, "text/html", menu + "<form method='POST'><textarea name='melody'>Intel:d=16,o=5,b=320:d,p,d,p,d,p,g,p,g,p,g,p,d,p,d,p,d,p,a,p,a,p,a,2p</textarea><button>play</button></form>");
+            webServer.send(200, "text/html", menu + "<form method='POST'><textarea name='melody'>Intel:d=16,o=5,b=320:d,p,d,p,d,p,g,p,g,p,g,p,d,p,d,p,d,p,a,p,a,p,a,2p</textarea><button>play</button></form>");
         }
     });
 
@@ -254,7 +280,7 @@ void setup()
         File f = SPIFFS.open("/manual.txt", "w");
         f.print("hello");
         f.close();
-        Dir dir = SPIFFS.openDir("/");
+        Dir dir = SPIFFS.openDir("");
         while (dir.next()) {
             output += String() + dir.fileSize() + "B " + dir.fileName() + "\n";
         }
@@ -295,21 +321,34 @@ void setup()
     myTone(1500, 100);
 }
 
-boolean in_array(unsigned int array[], int sz, unsigned int element) {
- for (int i = 0; i < sz; i++) {
-      if (array[i] == element) {
-          return true;
-      }
+// boolean in_array(unsigned int array[], int sz, unsigned int element) {
+//     for (int i = 0; i < sz; i++) {
+//       if (array[i] == element) {
+//           return true;
+//       }
+//     }
+//     return false;
+// }
+
+
+bool isInStopList(long receivedValue)
+{
+    File f = SPIFFS.open("stop-list.txt", "r");
+    if(!f) return false;
+    f.setTimeout(0); // to prevent delays
+    while(f.available()){
+        String line = f.readStringUntil('\n');
+        long code = line.toInt();
+        //logger.log(String() + "code: " + code);
+
+        if(receivedValue == code) {
+            f.close();
+            return true;
+        }
     }
-  return false;
- }
-
-
-unsigned int spamList [] = {
-    11283408,
-    11283248
-};
-
+    f.close();
+    return false;
+}
 
 
 void handleRadio()
@@ -324,12 +363,19 @@ void handleRadio()
             " d: " + mySwitch.getReceivedDelay() + 
             " l: " + mySwitch.getReceivedBitlength());
 
-        if(in_array(spamList, sizeof(spamList)/sizeof(int),  receivedValue) || receivedValue < 1000){
-            tone(BUZZER_PIN, 800, 10); // beep sound
+        if(isInStopList(receivedValue))
+        {
+            logger.log(String() + "The value " + receivedValue + " is in the stop list! Skiping it");
+            mySwitch.resetAvailable();
+            return;
         }
-        else{
-            tone(BUZZER_PIN, 800, 50); // beep sound
+        else if (receivedValue < 1000)
+        {
+            logger.log(String() + "The value " + receivedValue + " is too small! Skiping it");
+            mySwitch.resetAvailable();
+            return;
         }
+        tone(BUZZER_PIN, 800, 50); // beep sound
         tone(LED_PIN, 800, 50);    // flash led
 
 
