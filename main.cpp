@@ -216,23 +216,20 @@ void setup()
     });
 
 
-
     // Play melody 
     webServer.on("/play", [menu](){
+        String output = "";
+        output += menu;
+        String melody = "Intel:d=16,o=5,b=320:d,p,d,p,d,p,g,p,g,p,g,p,d,p,d,p,d,p,a,p,a,p,a,2p";
         if(webServer.method() == HTTP_POST){
-            String melody = webServer.arg("melody");
-
-            if(melody.length() > 0){
-                rtttl.play(melody);
-                webServer.send(200, "text/html", String("Playing melody: ") + melody);        
-            }
-            else
-                webServer.send(400, "text/html", "'melody' GET parameter is required");
+            melody = webServer.arg("melody");
+            rtttl.play(melody);
+            output += "Playing melody: " + melody;
         }
-        else{
-            webServer.send(200, "text/html", menu + "<form method='POST'><textarea name='melody'>Intel:d=16,o=5,b=320:d,p,d,p,d,p,g,p,g,p,g,p,d,p,d,p,d,p,a,p,a,p,a,2p</textarea><button>play</button></form>");
-        }
+        output += "<form method='POST'><textarea name='melody' rows=10>"+melody+"</textarea><br><button>play</button></form>";
+        webServer.send(200, "text/html", output);
     });
+
 
     // Restart ESP
     webServer.on("/restart", [menu](){
