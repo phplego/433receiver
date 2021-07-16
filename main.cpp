@@ -6,7 +6,7 @@
 #include <MQTT.h>
 #include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
-//#include <LittleFS.h>
+#include <LittleFS.h>
 
 #include "DubRtttl.h"
 #include "Logger.h"
@@ -32,7 +32,7 @@ String gTopic       = "wifi2mqtt/433receiver";
 WiFiManager         wifiManager;
 WiFiClient          wifiClient;
 RCSwitch            mySwitch;
-MQTTClient          mqttClient(10000);
+MQTTClient          mqttClient(2048);
 ESP8266WebServer    webServer(80);
 DubRtttl            rtttl(BUZZER_PIN);
 Logger              logger;
@@ -50,10 +50,12 @@ void messageReceived(String &topic, String &payload)
     if (topic == gTopic + "/set")
     {
         // parse json
-        DynamicJsonDocument doc(10000);
+        DynamicJsonDocument doc(2048);
         DeserializationError error = deserializeJson(doc, payload);
-        if (error)
+        if (error){
+            logger.log("failed to parse json");
             return;
+        }
 
         if (doc.containsKey("melody"))
         {
@@ -148,16 +150,16 @@ void setup()
     bool ok = mqttClient.publish(gTopic, "started");
     logger.log(ok ? "Status successfully published to MQTT" : "Cannot publish status to MQTT");
 
-    if(!SPIFFS.begin()){
-        logger.log("format SPIFFS...");
-        SPIFFS.format();
-        SPIFFS.begin();
+    if(!LittleFS.begin()){
+        logger.log("format LittleFS...");
+        LittleFS.format();
+        LittleFS.begin();
     }
 
     // setup webserver 
     webServer.begin();
 
-    //webServer.serveStatic("/logs.js", SPIFFS, "/logs.js");
+    //webServer.serveStatic("/logs.js", LittleFS, "/logs.js");
     
     
     String menu;
@@ -196,7 +198,7 @@ void setup()
         String output = menu;
         if(webServer.method() == HTTP_POST){
             String list = webServer.arg("list");
-            File f = SPIFFS.open("stop-list.txt", "w");
+            File f = LittleFS.open("stop-list.txt", "w");
 
             if(f && f.print(list) == list.length()){
                 output += "Saved OK.<br>";
@@ -208,7 +210,7 @@ void setup()
         }
         output += "New line separated values to be ignored:<br>";
         output += "<form method='POST'><textarea name='list' rows=10>";
-        File f = SPIFFS.open("stop-list.txt", "r");
+        File f = LittleFS.open("stop-list.txt", "r");
         output += f.readString();
         f.close();
         output += "</textarea><br><button>save</button></form>";
@@ -251,20 +253,25 @@ void setup()
     // Show logs page
     webServer.on("/logs", [menu](){
         String output = "";
+        String output2 = "";
         output += menu;
         output += String() + "millis: <span id='millis'>"+millis()+"</span>";
+        output += String() + "<br>size="+strlen(logger.buffer);
         output += String() + "<pre id='text'>";
-        output += String() + logger.buffer;
-        output += String() + "</pre>\n";
-        output += String() + "<script>\n";
-        output += String() + "const millis = " + millis()+"\n";
-        output += String() + "const replaceFunc = x => {\n";
-        output += String() +    "const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
-        output += String() +    "return new Date(Date.now() - deltaMillis).toLocaleString('RU')\n";
-        output += String() + "}\n";
-        output += String() + "document.getElementById('text').innerHTML = document.getElementById('text').innerHTML.replaceAll(/^\\d{3,}\\.\\d{3}/mg, replaceFunc)\n";
-        output += String() + "</script>";
-        webServer.send(400, "text/html", output);
+        //output += String() + logger.buffer;
+        output2 += String() + "</pre>\n";
+        output2 += String() + "<script>\n";
+        output2 += String() + "const millis = " + millis()+"\n";
+        output2 += String() + "const replaceFunc = x => {\n";
+        output2 += String() +    "const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
+        output2 += String() +    "return new Date(Date.now() - deltaMillis).toLocaleString('RU')\n";
+        output2 += String() + "}\n";
+        output2 += String() + "document.getElementById('text').innerHTML = document.getElementById('text').innerHTML.replaceAll(/^\\d{3,}\\.\\d{3}/mg, replaceFunc)\n";
+        output2 += String() + "</script>";
+        webServer.setContentLength(output.length() + strlen(logger.buffer) + output2.length());
+        webServer.send(200, "text/html", output);
+        webServer.sendContent(String() + logger.buffer);
+        webServer.sendContent(output2);
     });
     
     // Show filesystem list of files
@@ -272,7 +279,7 @@ void setup()
         String output = "";
         output += menu;
         output += String() + "<pre>";
-        Dir dir = SPIFFS.openDir("");
+        Dir dir = LittleFS.openDir("");
         while (dir.next()) {
             output += String() + dir.fileSize() + "B " + dir.fileName() + "\n";
         }
@@ -325,7 +332,7 @@ void setup()
 
 bool isInStopList(long receivedValue)
 {
-    File f = SPIFFS.open("stop-list.txt", "r");
+    File f = LittleFS.open("stop-list.txt", "r");
     if(!f) return false;
     f.setTimeout(0); // to prevent delays
     while(f.available()){

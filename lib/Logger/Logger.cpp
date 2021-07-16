@@ -38,8 +38,9 @@ void Logger::print(String message)
         this->position = this->position - shrinkSize; 
     }
 
+    //strncpy((char*)this->buffer + this->position, message.c_str(), message.length());
     int written = sprintf((char*)this->buffer + this->position, "%s", message.c_str());
-    this->position += written;
+    this->position += message.length();
 }
 
 
