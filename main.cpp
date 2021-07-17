@@ -29,6 +29,8 @@
 String gDeviceName  = String() + "433receiver-" + ESP.getChipId();
 String gTopic       = "wifi2mqtt/433receiver";
 
+int    gLastWifiStatus = 0;
+
 WiFiManager         wifiManager;
 WiFiClient          wifiClient;
 RCSwitch            mySwitch;
@@ -79,14 +81,7 @@ void messageReceived(String &topic, String &payload)
 
 void mqtt_connect()
 {
-    logger.log_no_ln("checking wifi...");
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        logger.print(".");
-        delay(1000);
-    }
-    logger.println(" OK");
-    logger.log_no_ln("connecting...");
+    logger.log_no_ln("connecting to MQTT...");
     while (!mqttClient.connect(gDeviceName.c_str(), MQTT_USER, MQTT_PASS))
     {
         logger.print(".");
@@ -407,8 +402,16 @@ void loop()
     webServer.handleClient();
     mqttClient.loop();
 
-    if (!mqttClient.connected())
+    if(gLastWifiStatus != WiFi.status()){
+        logger.log(String() + "WiFi goes to status " + WiFi.status());
+        gLastWifiStatus = WiFi.status();
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
     {
-        mqtt_connect();
+        if (!mqttClient.connected())
+        {
+            mqtt_connect();
+        }    
     }
 }
