@@ -29,8 +29,6 @@
 String gDeviceName  = String() + "433receiver-" + ESP.getChipId();
 String gTopic       = "wifi2mqtt/433receiver";
 
-int    gLastWifiStatus = 0;
-
 WiFiManager         wifiManager;
 WiFiClient          wifiClient;
 RCSwitch            mySwitch;
@@ -79,20 +77,27 @@ void messageReceived(String &topic, String &payload)
     }
 }
 
+
 void mqtt_connect()
 {
-    logger.log_no_ln("connecting to MQTT...");
-    while (!mqttClient.connect(gDeviceName.c_str(), MQTT_USER, MQTT_PASS))
+    static unsigned long stLastConnectTryTime = 0;
+
+    // retring to connect not too often (every minute)
+    if(stLastConnectTryTime && millis() - stLastConnectTryTime < 60000)
+        return;
+
+    stLastConnectTryTime = millis();
+
+    logger.log_no_ln("Connecting to MQTT...");
+    
+    if(mqttClient.connect(gDeviceName.c_str(), MQTT_USER, MQTT_PASS))
     {
-        logger.print(".");
-        delay(1000);
+        logger.println(" connected!");
+        mqttClient.subscribe(gTopic + "/set");
+        mqttClient.subscribe(gTopic + "/play");
     }
-    logger.println(" OK");
-
-    logger.log("connected!");
-
-    mqttClient.subscribe(gTopic + "/set");
-    mqttClient.subscribe(gTopic + "/play");
+    else
+        logger.println(" failed. Retry in 60 sec..");
 }
 
 
@@ -315,14 +320,22 @@ void setup()
     myTone(1500, 100);
 }
 
-// boolean in_array(unsigned int array[], int sz, unsigned int element) {
-//     for (int i = 0; i < sz; i++) {
-//       if (array[i] == element) {
-//           return true;
-//       }
-//     }
-//     return false;
-// }
+
+const char* wlStatusToString(wl_status_t status) 
+{
+    switch (status) {
+        case WL_NO_SHIELD: return "WL_NO_SHIELD";
+        case WL_IDLE_STATUS: return "WL_IDLE_STATUS";
+        case WL_NO_SSID_AVAIL: return "WL_NO_SSID_AVAIL";
+        case WL_SCAN_COMPLETED: return "WL_SCAN_COMPLETED";
+        case WL_CONNECTED: return "WL_CONNECTED";
+        case WL_CONNECT_FAILED: return "WL_CONNECT_FAILED";
+        case WL_CONNECTION_LOST: return "WL_CONNECTION_LOST";
+        case WL_WRONG_PASSWORD: return "WL_WRONG_PASSWORD";
+        case WL_DISCONNECTED: return "WL_DISCONNECTED";
+        default: return "unknown wl code";
+    }
+}
 
 
 bool isInStopList(long receivedValue)
@@ -402,9 +415,10 @@ void loop()
     webServer.handleClient();
     mqttClient.loop();
 
-    if(gLastWifiStatus != WiFi.status()){
-        logger.log(String() + "WiFi goes to status " + WiFi.status());
-        gLastWifiStatus = WiFi.status();
+    static int stLastWifiStatus = 0;
+    if(stLastWifiStatus != WiFi.status()){
+        logger.log(String() + "WiFi goes to status " + wlStatusToString(WiFi.status()));
+        stLastWifiStatus = WiFi.status();
     }
 
     if (WiFi.status() == WL_CONNECTED)
