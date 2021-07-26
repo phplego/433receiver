@@ -10,6 +10,7 @@ public:
     void log_no_ln(String message);
     void log(String message);
     void print(String message);
+    void ln();
     void println(String message);
 
     char buffer [LOGGER_BUFFER_SIZE + 1] = {0};

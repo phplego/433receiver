@@ -365,23 +365,24 @@ void handleRadio()
         long receivedValue = mySwitch.getReceivedValue();
         int delay = mySwitch.getReceivedDelay();
 
-        logger.log(String()+"got value " + receivedValue + 
+        logger.log_no_ln(String()+"Value " + receivedValue + 
             " p: "+mySwitch.getReceivedProtocol() + 
             " d: " + mySwitch.getReceivedDelay() + 
             " l: " + mySwitch.getReceivedBitlength());
 
         if(isInStopList(receivedValue))
         {
-            logger.log(String() + "The value " + receivedValue + " is in the stop list! Skiping it");
+            logger.println(String() + " is in the stop list! Skiping it");
             mySwitch.resetAvailable();
             return;
         }
         else if (receivedValue < 1000)
         {
-            logger.log(String() + "The value " + receivedValue + " is too small! Skiping it");
+            logger.println(String() + " is too small! Skiping it");
             mySwitch.resetAvailable();
             return;
         }
+        logger.ln();
         tone(BUZZER_PIN, 800, 50); // beep sound
         tone(LED_PIN, 800, 50);    // flash led
 

@@ -17,12 +17,19 @@ void Logger::log_no_ln(String message)
 
 void Logger::log(String message)
 {
-    this->log_no_ln(message + "\n");
+    this->log_no_ln(message);
+    this->ln();
+}
+
+void Logger::ln()
+{
+    this->print("\n");
 }
 
 void Logger::println(String message)
 {
-    this->print(message + "\n");
+    this->print(message);
+    this->ln();
 }
 
 void Logger::print(String message)
@@ -39,7 +46,7 @@ void Logger::print(String message)
     }
 
     //strncpy((char*)this->buffer + this->position, message.c_str(), message.length());
-    int written = sprintf((char*)this->buffer + this->position, "%s", message.c_str());
+    sprintf((char*)this->buffer + this->position, "%s", message.c_str());
     this->position += message.length();
 }
 
