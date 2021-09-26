@@ -387,14 +387,15 @@ void handleRadio()
             mySwitch.resetAvailable();
             return;
         }
-        logger.ln();
 
         // messages with the same value received with less than MIN_INTERVAL will be ignored
         if(receivedValue == lastReceivedValue && millis() < lastMessageTime + MIN_INTERVAL){
-            logger.println(String() + "Skip duplicate");
+            logger.println(String() + " skip duplicate");
             mySwitch.resetAvailable();
             return; 
         }
+
+        logger.ln();
 
         lastReceivedValue = receivedValue;
         lastMessageTime = millis();
