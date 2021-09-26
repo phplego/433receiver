@@ -360,6 +360,10 @@ bool isInStopList(long receivedValue)
 
 void handleRadio()
 {
+    static int lastReceivedValue = 0;
+    static unsigned long lastMessageTime = 0;
+    const unsigned long MIN_INTERVAL = 1000; // ms; messages with the same value received with less than this interval will be ignored
+
     if (mySwitch.available())
     {
         long receivedValue = mySwitch.getReceivedValue();
@@ -369,6 +373,7 @@ void handleRadio()
             " p: "+mySwitch.getReceivedProtocol() + 
             " d: " + mySwitch.getReceivedDelay() + 
             " l: " + mySwitch.getReceivedBitlength());
+
 
         if(isInStopList(receivedValue))
         {
@@ -383,6 +388,19 @@ void handleRadio()
             return;
         }
         logger.ln();
+
+        // messages with the same value received with less than MIN_INTERVAL will be ignored
+        if(receivedValue == lastReceivedValue && millis() < lastMessageTime + MIN_INTERVAL){
+            logger.println(String() + "Skip duplicate");
+            mySwitch.resetAvailable();
+            return; 
+        }
+
+        lastReceivedValue = receivedValue;
+        lastMessageTime = millis();
+
+
+
         tone(BUZZER_PIN, 800, 50); // beep sound
         tone(LED_PIN, 800, 50);    // flash led
 
