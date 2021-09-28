@@ -3,7 +3,17 @@
 
 Logger::Logger() 
 {
+}
 
+void Logger::init() 
+{
+    LittleFS.begin();
+    // load saved content
+    if(LittleFS.exists(this->filename)){
+        File f = LittleFS.open(this->filename, "r");
+        this->print(f.readString());
+        f.close();
+    }
 }
 
 void Logger::log_no_ln(String message)
@@ -20,6 +30,12 @@ void Logger::log(String message)
     this->log_no_ln(message);
     this->ln();
 }
+
+void Logger::log(String message, String message2)
+{
+    this->log(message + " " + message2);
+}
+
 
 void Logger::ln()
 {
@@ -50,4 +66,23 @@ void Logger::print(String message)
     this->position += message.length();
 }
 
+void Logger::flush()
+{
+    File f = LittleFS.open(this->filename, "w");
+    f.print(String() + this->buffer);
+    f.close();
+}
 
+void Logger::loop()
+{
+    if(this->persistant)
+    {
+        static unsigned long lastFlushTime = 0;
+        const unsigned long FLUSH_INTERVAL = 10000; // save to file every 10 seconds
+
+        if(millis() > lastFlushTime + FLUSH_INTERVAL){
+            this->flush();
+            lastFlushTime = millis();
+        }
+    }
+}

@@ -103,6 +103,7 @@ void mqtt_connect()
 
 void setup()
 {
+    logger.init();
     logger.log("Setup begin");
 
     Serial.begin(74880);
@@ -262,9 +263,11 @@ void setup()
         output2 += String() + "</pre>\n";
         output2 += String() + "<script>\n";
         output2 += String() + "const millis = " + millis()+"\n";
+        output2 += String() + "const browserMillis = Date.now()\n";
         output2 += String() + "const replaceFunc = x => {\n";
-        output2 += String() +    "const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
-        output2 += String() +    "return new Date(Date.now() - deltaMillis).toLocaleString('RU')\n";
+        output2 += String() + "  const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
+        output2 += String() + "  const diff = browserMillis - deltaMillis\n";        
+        output2 += String() + "  return new Date(diff).toLocaleString('RU') + '.' + (diff % 1000)\n";
         output2 += String() + "}\n";
         output2 += String() + "document.getElementById('text').innerHTML = document.getElementById('text').innerHTML.replaceAll(/^\\d{3,}\\.\\d{3}/mg, replaceFunc)\n";
         output2 += String() + "</script>";
@@ -431,6 +434,7 @@ void loop()
 {
     handleRadio();
     ArduinoOTA.handle();
+    logger.loop();
     rtttl.loop();
     webServer.handleClient();
     mqttClient.loop();
