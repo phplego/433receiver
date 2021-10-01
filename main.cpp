@@ -283,13 +283,16 @@ void setup()
     webServer.on("/fs", [menu](){
         String output = "";
         output += menu;
-        output += String() + "<pre>";
+        output += String() + "<table>";
         Dir dir = LittleFS.openDir("");
         while (dir.next()) {
-            output += String() + dir.fileSize() + "B <a href='/fs/view-file?f="+dir.fileName()+"'>" + dir.fileName() + "</a>\n";
+            output += "<tr>";
+            output += "<td><a href='/fs/view-file?f="+dir.fileName()+"'>" + dir.fileName() + "</a></td>\n";
+            output += "<td>" + String(dir.fileSize()) + "</td>\n";
+            output += "</tr>";
         }
 
-        output += String() + "</pre>";
+        output += String() + "</table>";
         webServer.send(200, "text/html", output);
     });
 
