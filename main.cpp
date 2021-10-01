@@ -162,9 +162,11 @@ void setup()
 
     //webServer.serveStatic("/logs.js", LittleFS, "/logs.js");
     
-    
+    String domainLan = String() + WiFi.hostname() + ".lan";
+
     String menu;
         menu += "<div>";
+        menu += String() + "<a href='http://"+domainLan+"'>"+domainLan+"</a> | ";
         menu += "<a href='/'>index</a> ";
         menu += "<a href='/stop-list'>stop-list</a> ";
         menu += "<a href='/play'>play</a> ";
@@ -247,7 +249,7 @@ void setup()
             output += String() + "Uptime: " + (millis() / 1000) + " \n";
             output += String() + "</pre>";
             output += "<form method='post'><button>Restart ESP now!</button></form>";
-            webServer.send(400, "text/html", output);
+            webServer.send(200, "text/html", output);
         }
     });
 
@@ -267,7 +269,7 @@ void setup()
         output2 += String() + "const replaceFunc = x => {\n";
         output2 += String() + "  const deltaMillis = millis - parseInt(x.replace('.', ''))\n";        
         output2 += String() + "  const diff = browserMillis - deltaMillis\n";        
-        output2 += String() + "  return new Date(diff).toLocaleString('RU') + '.' + (diff % 1000)\n";
+        output2 += String() + "  return new Date(diff).toLocaleString('RU') + '.' + ('00'+(diff % 1000)).slice(-3)\n";
         output2 += String() + "}\n";
         output2 += String() + "document.getElementById('text').innerHTML = document.getElementById('text').innerHTML.replaceAll(/^\\d{3,}\\.\\d{3}/mg, replaceFunc)\n";
         output2 += String() + "</script>";
@@ -284,12 +286,30 @@ void setup()
         output += String() + "<pre>";
         Dir dir = LittleFS.openDir("");
         while (dir.next()) {
-            output += String() + dir.fileSize() + "B " + dir.fileName() + "\n";
+            output += String() + dir.fileSize() + "B <a href='/fs/view-file?f="+dir.fileName()+"'>" + dir.fileName() + "</a>\n";
         }
 
         output += String() + "</pre>";
-        webServer.send(400, "text/html", output);
+        webServer.send(200, "text/html", output);
     });
+
+    // View file
+    webServer.on("/fs/view-file", [menu](){
+        String filename = webServer.arg("f");
+        String output = menu;
+        output += "<h2>"+filename+"</h2>";
+        output += "<pre>";
+        File f = LittleFS.open(filename, "r");
+        if(!f){
+            webServer.send(400, "text/html", "cannot open file");
+            return;
+        } 
+        output += f.readString();
+        f.close();
+        output += "</pre>";
+        webServer.send(200, "text/html", output);
+    });
+
 
 
     // Logout (reset wifi settings)

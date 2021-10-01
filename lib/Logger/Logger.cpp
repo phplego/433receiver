@@ -11,7 +11,8 @@ void Logger::init()
     // load saved content
     if(LittleFS.exists(this->filename)){
         File f = LittleFS.open(this->filename, "r");
-        this->print(f.readString());
+        sprintf((char*)this->buffer, "%s", f.readString().c_str());
+        this->position = f.size();
         f.close();
     }
 }
